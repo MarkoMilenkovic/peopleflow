@@ -60,9 +60,9 @@ public class UserController {
                     content = {@Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class))})
     })
-    @PutMapping(path = "/{userId}")
-    public UserDto updateUserState(@PathVariable Long userId, @RequestBody StateDto stateDto) {
-        UserEntity savedUser = userService.updateUserState(userId, stateDto.getState());
+    @PutMapping(value = "{userId}")
+    public UserDto updateUserState(@PathVariable Long userId, @RequestBody StateDto state) {
+        UserEntity savedUser = userService.updateUserState(userId, state.getState());
         return userMapper.toUserDto(savedUser);
     }
 
