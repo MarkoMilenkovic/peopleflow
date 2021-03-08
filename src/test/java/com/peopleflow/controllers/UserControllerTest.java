@@ -1,63 +1,120 @@
 package com.peopleflow.controllers;
 
+import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.peopleflow.dto.StateDto;
 import com.peopleflow.dto.UserDto;
 import com.peopleflow.entity.UserEntity;
+import com.peopleflow.enums.ExceptionMessages;
+import com.peopleflow.enums.StateEnum;
 import com.peopleflow.mappers.UserMapper;
 import com.peopleflow.services.UserService;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-@ExtendWith(MockitoExtension.class)
-class UserControllerTest {
+import java.util.Collections;
 
-    @Mock
+@WebMvcTest(UserController.class)
+public class UserControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private UserService userService;
-
-    @Mock
+    @MockBean
     private UserMapper userMapper;
+    @Autowired
+    private ObjectMapper objectMapper;
 
-    @InjectMocks
-    private UserController userController;
-
-
-    @Test
-    void registerUserTest() {
-        UserDto userDto = prepareUserDto();
-        UserEntity userEntity = new UserEntity();
-
-        when(userMapper.toUserEntity(userDto)).thenReturn(userEntity);
-        when(userService.save(any(UserEntity.class))).thenReturn(userEntity);
-        when(userMapper.toUserDto(userEntity)).thenReturn(userDto);
-
-        UserDto savedUser = userController.registerUser(userDto);
-        assertEquals(userDto, savedUser);
-        verifyNoMoreInteractions(userService, userMapper);
-    }
+    private final UserDto userDto =
+            new UserDto(1L, "lemilivoskodi", "Marko Milenkovic", StateEnum.ADDED.getStateName());
 
     @Test
-    void updateUserStateTest() {
-        UserDto userDto = prepareUserDto();
-        when(userMapper.toUserDto(any(UserEntity.class))).thenReturn(userDto);
-        when(userService.updateUserState(anyLong(), anyString())).thenReturn(new UserEntity());
-
-        UserDto savedUser = userController.updateUserState(1L, new StateDto("state"));
-        assertEquals(userDto, savedUser);
+    public void getAllUsersTest() throws Exception {
+        when(userService.getAllUsers()).thenReturn(Collections.singletonList(new UserEntity()));
+        when(userMapper.toUserDtos(anyList()))
+                .thenReturn(Collections.singletonList(userDto));
+        this.mockMvc.perform(get("/user"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(userDto.getFullName())))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].username", is(userDto.getUsername())))
+                .andExpect(jsonPath("$[0].fullName", is(userDto.getFullName())))
+                .andExpect(jsonPath("$[0].state", is(StateEnum.ADDED.getStateName())));
+        verify(userService).getAllUsers();
+        verify(userMapper).toUserDtos(anyList());
+        verifyNoMoreInteractions(userMapper, userService);
     }
 
-    private UserDto prepareUserDto() {
-        UserDto userDto = new UserDto();
-        userDto.setFullName("Marko Milenkovic");
-        userDto.setUsername("lemilivoskodi");
-        return userDto;
+    @Test
+    public void registerUserTestSuccess() throws Exception {
+		UserEntity userEntity =
+				new UserEntity(1L, "lemilivoskodi", "Marko Milenkovic", StateEnum.ADDED.getStateName());
+        when(userMapper.toUserEntity(any())).thenReturn(userEntity);
+        when(userService.save(any())).thenReturn(userEntity);
+        when(userMapper.toUserDto(any())).thenReturn(userDto);
+        this.mockMvc.perform(
+                post("/user").content(objectMapper.writeValueAsString(userDto)).contentType(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(userDto.getFullName())))
+                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.username", is(userDto.getUsername())))
+                .andExpect(jsonPath("$.fullName", is(userDto.getFullName())))
+                .andExpect(jsonPath("$.state", is(StateEnum.ADDED.getStateName())));
+        verify(userService).save(any());
+        verify(userMapper).toUserEntity(any());
+        verify(userMapper).toUserDto(any());
+        verifyNoMoreInteractions(userMapper, userService);
     }
+
+	@Test
+	public void updateUserStateTestIllegalState() throws Exception {
+		StateDto stateDto = new StateDto("some state");
+		when(userService.updateUserState(anyLong(), any())).thenCallRealMethod();
+		this.mockMvc.perform(
+				patch("/user/1").content(objectMapper.writeValueAsString(stateDto)).contentType(MediaType.APPLICATION_JSON))
+				.andDo(print())
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message", is(ExceptionMessages.INVALID_STATE.getMessage())));
+		verify(userService).updateUserState(anyLong(), any());
+		verifyNoInteractions(userMapper);
+		verifyNoMoreInteractions(userMapper, userService);
+	}
+
+
+	@Test
+	public void updateUserStateTestSuccess() throws Exception {
+		StateDto stateDto = new StateDto(StateEnum.ADDED.getStateName());
+		UserEntity userEntity =
+				new UserEntity(1L, "lemilivoskodi", "Marko Milenkovic", StateEnum.ADDED.getStateName());
+		when(userService.updateUserState(anyLong(), any())).thenReturn(userEntity);
+		when(userMapper.toUserDto(any())).thenReturn(userDto);
+		this.mockMvc.perform(
+				patch("/user/1").content(objectMapper.writeValueAsString(stateDto)).contentType(MediaType.APPLICATION_JSON))
+				.andDo(print())
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id", is(1)))
+				.andExpect(jsonPath("$.username", is(userDto.getUsername())))
+				.andExpect(jsonPath("$.fullName", is(userDto.getFullName())))
+				.andExpect(jsonPath("$.state", is(StateEnum.ADDED.getStateName())));
+		verify(userService).updateUserState(anyLong(), any());
+		verify(userMapper).toUserDto(any());
+		verifyNoMoreInteractions(userMapper, userService);
+	}
 
 }

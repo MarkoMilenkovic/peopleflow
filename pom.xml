@@ -13,9 +13,6 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<name>peopleflow</name>
 	<description>Demo project for peopleflow</description>
-	<properties>
-		<java.version>8</java.version>
-	</properties>
 	<dependencies>
 
 		<dependency>
