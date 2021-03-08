@@ -11,12 +11,3 @@ public class PeopleFlowDemoApplication {
 	}
 
 }
-
-
-//	CREATE TABLE `new_schema`.`peopleflow_user` (
-//		`id` INT NOT NULL AUTO_INCREMENT,
-//		`username` VARCHAR(45) NULL,
-//		`full_name` VARCHAR(45) NULL,
-//		`user_state` VARCHAR(45) NULL,
-//		PRIMARY KEY (`id`));
-

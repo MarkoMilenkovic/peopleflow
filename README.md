@@ -16,3 +16,6 @@ go to root folder of project create docker image:
 docker build -t peopleflow .
 
 docker run -p 8080:8080 --name peopleflow --link mysql-standalone:mysql peopleflow
+
+Open API documentation:
+http://localhost:8080/peopleflow/api/swagger-ui.html
